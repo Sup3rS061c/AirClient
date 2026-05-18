@@ -36,6 +36,25 @@ public class NewUi extends GuiScreen {
     private final SearchElement searchElement = new SearchElement();
 
     public int scrollAmt = 0;
+    private float targetScrollAmt = 0F;
+    private float animScrollAmt = 0F;
+    private float maxScroll = 0F;
+    
+    private boolean isDragging = false;
+    private float dragOffsetX = 0F;
+    private float dragOffsetY = 0F;
+    private float customPanelX = 0F;
+    private float customPanelY = 30F;
+    private boolean hasCustomPosition = false;
+
+    private int lastScaledWidth = 0;
+    private int lastScaledHeight = 0;
+    private float lastScaleWidth = 0F;
+    private float lastScaleHeight = 0F;
+    private float cachedPanelX = 0F;
+    private float cachedPanelY = 30F;
+    private float cachedPanelWidth = 0F;
+    private float cachedPanelHeight = 0F;
 
     public NewUi() {
         for (Category c : Category.values()) {
@@ -54,16 +73,35 @@ public class NewUi extends GuiScreen {
         final ScaledResolution sr = new ScaledResolution(mc);
         int scrollWheel = Mouse.getDWheel();
 
-        if (scrollWheel != 0) {
-            if (scrollWheel < 0) scrollAmt += 5;
-            else scrollAmt -= 5;
-            scrollAmt = Math.max(0, Math.min(scrollAmt, getScrollHeight(sr)));
+        final float scaleWidth = NewGUI.INSTANCE.getScaleWidth();
+        final float scaleHeight = NewGUI.INSTANCE.getScaleHeight();
+        final float panelWidth = sr.getScaledWidth() * scaleWidth;
+        final float panelHeight = sr.getScaledHeight() * scaleHeight;
+
+        if (sr.getScaledWidth() != lastScaledWidth || sr.getScaledHeight() != lastScaledHeight ||
+            scaleWidth != lastScaleWidth || scaleHeight != lastScaleHeight) {
+            lastScaledWidth = sr.getScaledWidth();
+            lastScaledHeight = sr.getScaledHeight();
+            lastScaleWidth = scaleWidth;
+            lastScaleHeight = scaleHeight;
+            cachedPanelX = (sr.getScaledWidth() - panelWidth) / 2;
+            cachedPanelY = (sr.getScaledHeight() - panelHeight) / 2;
+            cachedPanelWidth = panelWidth;
+            cachedPanelHeight = panelHeight;
         }
 
-        final float panelWidth = sr.getScaledWidth() - 40;
-        final float panelHeight = sr.getScaledHeight() - 40;
-        final float panelX = 30;
-        final float panelY = 30;
+        final float panelX = hasCustomPosition ? customPanelX : cachedPanelX;
+        final float panelY = hasCustomPosition ? customPanelY : cachedPanelY;
+
+        if (scrollWheel != 0) {
+            if (mouseX >= panelX + 5 && mouseX <= panelX + 195 &&
+                mouseY >= panelY + 5 && mouseY <= panelY + panelHeight - 5) {
+                targetScrollAmt -= scrollWheel * 0.5F;
+                targetScrollAmt = Math.max(0, Math.min(targetScrollAmt, maxScroll));
+            }
+        }
+
+        animScrollAmt += (targetScrollAmt - animScrollAmt) * 0.15F;
 
         int bgColor = ColorManager.INSTANCE.getBackground().getRGB();
         int bgAlpha = (bgColor >> 24) & 0xFF;
@@ -76,11 +114,16 @@ public class NewUi extends GuiScreen {
 
         // left sidebar
         RenderUtils.INSTANCE.drawRoundedRect(panelX + 5, panelY + 5, panelX + 195, panelY + panelHeight - 5, ColorManager.INSTANCE.getDropDown().getRGB(), 5f, RenderUtils.RoundedCorners.ALL);
-        float categoryY = panelY + 50 + scrollAmt;
-
+        
+        float totalCategoryHeight = categoryElements.size() * 37F;
+        maxScroll = Math.max(0, totalCategoryHeight - (panelHeight - 60F));
+        
+        float categoryY = panelY + 50F - animScrollAmt;
         for (CategoryElement c : categoryElements) {
-            c.drawLabel(mouseX, mouseY, panelX, categoryY, 200, 35);
-            categoryY += 37;
+            if (categoryY + 35F >= panelY + 5 && categoryY <= panelY + panelHeight - 5) {
+                c.drawLabel(mouseX, mouseY, panelX, categoryY, 200, 35);
+            }
+            categoryY += 37F;
         }
 
         // Search box
@@ -91,11 +134,17 @@ public class NewUi extends GuiScreen {
 
         boolean usingSearch = searchElement.drawBox(mouseX, mouseY, searchX, searchY, searchW, searchH, accentColor);
 
+        int moduleScrollWheel = 0;
+        if (mouseX >= panelX + 205 && mouseX <= panelX + panelWidth - 5 &&
+            mouseY >= panelY + 45 && mouseY <= panelY + panelHeight - 5) {
+            moduleScrollWheel = scrollWheel;
+        }
+
         if (usingSearch) {
-            searchElement.drawPanel(mouseX, mouseY, panelX + 205, panelY + 45, panelWidth - 210, panelHeight - 50, scrollWheel, categoryElements, accentColor);
+            searchElement.drawPanel(mouseX, mouseY, panelX + 205, panelY + 45, panelWidth - 210, panelHeight - 50, moduleScrollWheel, categoryElements, accentColor);
         } else {
             CategoryElement ce = categoryElements.stream().filter(CategoryElement::getFocused).findFirst().orElse(categoryElements.get(0));
-            ce.drawPanel(mouseX, mouseY, panelX + 205, panelY + 45, panelWidth - 210, panelHeight - 50, scrollWheel, accentColor);
+            ce.drawPanel(mouseX, mouseY, panelX + 205, panelY + 45, panelWidth - 210, panelHeight - 50, moduleScrollWheel, accentColor);
         }
 
         // title bar
@@ -103,23 +152,49 @@ public class NewUi extends GuiScreen {
 
         // right sidebar top
         Fonts.INSTANCE.getFont35().drawString("ClickGUI", panelX + 210, panelY + 15, Color.WHITE.getRGB());
+        
+        handleDrag(mouseX, mouseY);
+    }
+    
+    private void handleDrag(int mouseX, int mouseY) {
+        if (isDragging && Mouse.isButtonDown(0)) {
+            hasCustomPosition = true;
+            customPanelX = mouseX - dragOffsetX;
+            customPanelY = mouseY - dragOffsetY;
+        }
+        if (!Mouse.isButtonDown(0)) {
+            isDragging = false;
+        }
     }
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) {
         final ScaledResolution sr = new ScaledResolution(mc);
-        final float panelWidth = sr.getScaledWidth() - 40;
-        final float panelHeight = sr.getScaledHeight() - 40;
-        final float panelX = 30;
-        final float panelY = 30;
-        float categoryY = panelY + 50 + scrollAmt;
+        final float scaleWidth = NewGUI.INSTANCE.getScaleWidth();
+        final float scaleHeight = NewGUI.INSTANCE.getScaleHeight();
+        final float panelWidth = sr.getScaledWidth() * scaleWidth;
+        final float panelHeight = sr.getScaledHeight() * scaleHeight;
+        final float panelX = hasCustomPosition ? customPanelX : (sr.getScaledWidth() - panelWidth) / 2;
+        final float panelY = hasCustomPosition ? customPanelY : (sr.getScaledHeight() - panelHeight) / 2;
+
+        if (mouseButton == 0) {
+            if (mouseX >= panelX && mouseX <= panelX + panelWidth &&
+                mouseY >= panelY && mouseY <= panelY + 40) {
+                isDragging = true;
+                dragOffsetX = mouseX - panelX;
+                dragOffsetY = mouseY - panelY;
+                return;
+            }
+        }
+
+        float categoryY = panelY + 50F - animScrollAmt;
 
         for (CategoryElement c : categoryElements) {
             if (mouseX >= panelX && mouseX <= panelX + 200 && mouseY >= categoryY && mouseY <= categoryY + 35) {
                 categoryElements.forEach(x -> x.setFocused(false));
                 c.setFocused(true);
             }
-            categoryY += 37;
+            categoryY += 37F;
         }
 
         float searchX = panelX + 205;
@@ -145,11 +220,15 @@ public class NewUi extends GuiScreen {
 
     @Override
     protected void mouseReleased(int mouseX, int mouseY, int state) {
+        isDragging = false;
+        
         final ScaledResolution sr = new ScaledResolution(mc);
-        final float panelWidth = sr.getScaledWidth() - 40;
-        final float panelHeight = sr.getScaledHeight() - 40;
-        final float panelX = 30;
-        final float panelY = 30;
+        final float scaleWidth = NewGUI.INSTANCE.getScaleWidth();
+        final float scaleHeight = NewGUI.INSTANCE.getScaleHeight();
+        final float panelWidth = sr.getScaledWidth() * scaleWidth;
+        final float panelHeight = sr.getScaledHeight() * scaleHeight;
+        final float panelX = hasCustomPosition ? customPanelX : (sr.getScaledWidth() - panelWidth) / 2;
+        final float panelY = hasCustomPosition ? customPanelY : (sr.getScaledHeight() - panelHeight) / 2;
 
         float searchX = panelX + 205;
         float searchY = panelY + 10;
@@ -167,11 +246,20 @@ public class NewUi extends GuiScreen {
 
     @Override
     protected void mouseClickMove(int mouseX, int mouseY, int clickedMouseButton, long timeSinceLastClick) {
+        if (isDragging && clickedMouseButton == 0) {
+            hasCustomPosition = true;
+            customPanelX = mouseX - dragOffsetX;
+            customPanelY = mouseY - dragOffsetY;
+            return;
+        }
+
         final ScaledResolution sr = new ScaledResolution(mc);
-        final float panelWidth = sr.getScaledWidth() - 40;
-        final float panelHeight = sr.getScaledHeight() - 40;
-        final float panelX = 30;
-        final float panelY = 30;
+        final float scaleWidth = NewGUI.INSTANCE.getScaleWidth();
+        final float scaleHeight = NewGUI.INSTANCE.getScaleHeight();
+        final float panelWidth = sr.getScaledWidth() * scaleWidth;
+        final float panelHeight = sr.getScaledHeight() * scaleHeight;
+        final float panelX = hasCustomPosition ? customPanelX : (sr.getScaledWidth() - panelWidth) / 2;
+        final float panelY = hasCustomPosition ? customPanelY : (sr.getScaledHeight() - panelHeight) / 2;
 
         float searchX = panelX + 205;
         float searchW = panelWidth - 210;
@@ -197,10 +285,12 @@ public class NewUi extends GuiScreen {
         }
         
         final ScaledResolution sr = new ScaledResolution(mc);
-        final float panelWidth = sr.getScaledWidth() - 40;
-        final float panelHeight = sr.getScaledHeight() - 40;
-        final float panelX = 30;
-        final float panelY = 30;
+        final float scaleWidth = NewGUI.INSTANCE.getScaleWidth();
+        final float scaleHeight = NewGUI.INSTANCE.getScaleHeight();
+        final float panelWidth = sr.getScaledWidth() * scaleWidth;
+        final float panelHeight = sr.getScaledHeight() * scaleHeight;
+        final float panelX = (sr.getScaledWidth() - panelWidth) / 2;
+        final float panelY = (sr.getScaledHeight() - panelHeight) / 2;
         float searchX = panelX + 205;
         float searchW = panelWidth - 210;
         float searchH = panelHeight - 50;
@@ -228,7 +318,8 @@ public class NewUi extends GuiScreen {
     }
 
     private int getScrollHeight(ScaledResolution sr) {
-        int baseHeight = sr.getScaledHeight() - 40 - 30;
+        float panelHeight = sr.getScaledHeight() * NewGUI.INSTANCE.getScaleHeight();
+        int baseHeight = (int)(panelHeight - 30);
         int categoryHeight = 37 * categoryElements.size() + 50;
         return Math.max(0, categoryHeight - baseHeight);
     }

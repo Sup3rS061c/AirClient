@@ -11,7 +11,10 @@ import net.ccbluex.liquidbounce.features.module.Category
 import net.ccbluex.liquidbounce.features.module.Module
 import net.ccbluex.liquidbounce.ui.client.clickgui.ClickGui
 import net.ccbluex.liquidbounce.ui.client.clickgui.style.styles.BlackStyle
+import net.ccbluex.liquidbounce.ui.client.clickgui.style.styles.GlassStyle
 import net.ccbluex.liquidbounce.ui.client.clickgui.style.styles.LiquidBounceStyle
+import net.ccbluex.liquidbounce.ui.client.clickgui.style.styles.MinimalStyle
+import net.ccbluex.liquidbounce.ui.client.clickgui.style.styles.NeonStyle
 import net.ccbluex.liquidbounce.ui.client.clickgui.style.styles.NullStyle
 import net.ccbluex.liquidbounce.ui.client.clickgui.style.styles.SlowlyStyle
 import net.minecraft.network.play.server.S2EPacketCloseWindow
@@ -21,7 +24,7 @@ import java.awt.Color
 object ClickGUI : Module("ClickGUI", Category.CLIENT, Keyboard.KEY_RSHIFT, canBeEnabled = false) {
     private val style by choices(
         "Style",
-        arrayOf("LiquidBounce", "Null", "Slowly", "Black"),
+        arrayOf("LiquidBounce", "Null", "Slowly", "Black", "Neon", "Minimal", "Glass"),
         "LiquidBounce"
     ).onChanged {
         updateStyle()
@@ -50,6 +53,9 @@ object ClickGUI : Module("ClickGUI", Category.CLIENT, Keyboard.KEY_RSHIFT, canBe
             "Null" -> NullStyle
             "Slowly" -> SlowlyStyle
             "Black" -> BlackStyle
+            "Neon" -> NeonStyle
+            "Minimal" -> MinimalStyle
+            "Glass" -> GlassStyle
             else -> return
         }
     }

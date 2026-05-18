@@ -10,6 +10,7 @@ package net.ccbluex.liquidbounce.features.module.modules.client
 import net.ccbluex.liquidbounce.features.module.Category
 import net.ccbluex.liquidbounce.features.module.Module
 import net.ccbluex.liquidbounce.ui.client.clickgui.newVer.NewUi
+import net.ccbluex.liquidbounce.ui.client.clickgui.newVer.styles.aurora.AuroraGUI
 import net.ccbluex.liquidbounce.utils.render.ColorUtils
 import net.ccbluex.liquidbounce.utils.render.ColorUtils.fade
 import org.lwjgl.input.Keyboard
@@ -18,8 +19,13 @@ import java.util.*
 
 object NewGUI : Module("NewGUI", Category.CLIENT, Keyboard.KEY_RSHIFT, canBeEnabled = false) {
 
+    private val styleValue by choices("Style", arrayOf("Material", "Aurora"), "Material")
+
     override fun onEnable() {
-        mc.displayGuiScreen(NewUi.getInstance())
+        when (styleValue) {
+            "Aurora" -> mc.displayGuiScreen(AuroraGUI.getInstance())
+            else -> mc.displayGuiScreen(NewUi.getInstance())
+        }
     }
 
     val fastRenderValue by boolean("FastRender", false)
@@ -33,6 +39,10 @@ object NewGUI : Module("NewGUI", Category.CLIENT, Keyboard.KEY_RSHIFT, canBeEnab
     val colorGreenValue by int("Green", 140, 0..255)
 
     val colorBlueValue by int("Blue", 255, 0..255)
+
+    val scaleWidth by float("ScaleWidth", 0.7F, 0.3F..0.95F)
+    
+    val scaleHeight by float("ScaleHeight", 0.85F, 0.3F..0.95F)
 
     val accentColor: Color?
         get() {

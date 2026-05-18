@@ -168,8 +168,6 @@ object ModuleManager : Listenable, Collection<Module> by MODULE_REGISTRY {
             MultiActions,
             NameProtect,
             NameTags,
-            NameTags2,
-            RiseNameTags,
             NoBob,
             NoClip,
             NoFOV,
